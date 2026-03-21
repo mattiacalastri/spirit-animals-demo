@@ -1,23 +1,24 @@
 """Spirit Animals API — Demo per developer.
 
-Stack: FastAPI + Claude + fal.ai + SQLite (demo) / Supabase (prod)
+Stack: FastAPI + Claude + fal.ai + Supabase
 """
 
 import os
 import json
 import asyncio
-import sqlite3
 import uuid
 from datetime import datetime, timezone
-from contextlib import asynccontextmanager, contextmanager
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from contextlib import asynccontextmanager
 import anthropic
 import fal_client
+import httpx
 
 # Credenziali: env vars in produzione, file locali in dev
 if os.path.exists(os.path.expanduser("~/.config/credentials/aurahome.env")):
@@ -26,18 +27,66 @@ if os.path.exists(os.path.expanduser("~/.config/credentials/aurahome.env")):
 
 CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-3-haiku-20240307")
 FAL_ENABLED = bool(os.getenv("FAL_KEY"))
-DB_PATH = os.getenv("DB_PATH", "spirit_animals.db")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
+SUPABASE_ENABLED = bool(SUPABASE_URL and SUPABASE_KEY)
 
 claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 
 # ---------------------------------------------------------------------------
-# Database
+# Supabase Client (PostgREST)
 # ---------------------------------------------------------------------------
 
+class SupabaseClient:
+    """Thin wrapper around Supabase PostgREST API."""
+
+    def __init__(self, url: str, key: str):
+        self.base = f"{url}/rest/v1"
+        self.headers = {
+            "apikey": key,
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "Prefer": "return=representation",
+        }
+        self._client = httpx.AsyncClient(headers=self.headers, timeout=15.0)
+
+    async def insert(self, table: str, data: dict) -> dict:
+        r = await self._client.post(f"{self.base}/{table}", json=data)
+        r.raise_for_status()
+        rows = r.json()
+        return rows[0] if rows else data
+
+    async def select(self, table: str, params: dict | None = None) -> list[dict]:
+        r = await self._client.get(f"{self.base}/{table}", params=params or {})
+        r.raise_for_status()
+        return r.json()
+
+    async def select_one(self, table: str, column: str, value: str) -> dict | None:
+        params = {column: f"eq.{value}", "limit": "1"}
+        rows = await self.select(table, params)
+        return rows[0] if rows else None
+
+    async def close(self):
+        await self._client.aclose()
+
+
+db: SupabaseClient | None = None
+
+
+# ---------------------------------------------------------------------------
+# SQLite fallback (local dev without Supabase)
+# ---------------------------------------------------------------------------
+
+import sqlite3
+from contextlib import contextmanager
+
+SQLITE_PATH = os.getenv("DB_PATH", "spirit_animals.db")
+
+
 @contextmanager
-def get_db():
-    conn = sqlite3.connect(DB_PATH)
+def get_sqlite():
+    conn = sqlite3.connect(SQLITE_PATH)
     conn.row_factory = sqlite3.Row
     try:
         yield conn
@@ -46,40 +95,113 @@ def get_db():
         conn.close()
 
 
-def init_db():
-    with get_db() as conn:
+def init_sqlite():
+    with get_sqlite() as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS souls (
-                id TEXT PRIMARY KEY,
-                team_id TEXT,
-                name TEXT NOT NULL,
-                role TEXT,
-                animal TEXT NOT NULL,
-                emoji TEXT,
-                soul_name TEXT NOT NULL,
-                archetype TEXT,
-                traits TEXT,
-                superpower TEXT,
-                shadow TEXT,
-                motto TEXT,
-                color TEXT,
-                element TEXT,
-                collaboration_style TEXT,
-                avatar_url TEXT,
-                raw_input TEXT,
-                created_at TEXT NOT NULL
+                id TEXT PRIMARY KEY, team_id TEXT, name TEXT NOT NULL, role TEXT,
+                animal TEXT NOT NULL, emoji TEXT, soul_name TEXT NOT NULL, archetype TEXT,
+                traits TEXT, superpower TEXT, shadow TEXT, motto TEXT, color TEXT,
+                element TEXT, collaboration_style TEXT, avatar_url TEXT,
+                raw_input TEXT, created_at TEXT NOT NULL
             )
         """)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS teams (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                description TEXT,
-                soul_count INTEGER DEFAULT 0,
-                synergy TEXT,
-                created_at TEXT NOT NULL
+                id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT,
+                soul_count INTEGER DEFAULT 0, synergy TEXT, created_at TEXT NOT NULL
             )
         """)
+
+
+# ---------------------------------------------------------------------------
+# Persistence abstraction
+# ---------------------------------------------------------------------------
+
+async def db_insert_soul(data: dict) -> None:
+    if SUPABASE_ENABLED and db:
+        payload = {**data, "traits": data["traits"] if isinstance(data["traits"], list) else json.loads(data["traits"])}
+        await db.insert("souls", payload)
+    else:
+        with get_sqlite() as conn:
+            traits_str = json.dumps(data["traits"]) if isinstance(data["traits"], list) else data["traits"]
+            conn.execute(
+                """INSERT INTO souls (id, team_id, name, role, animal, emoji, soul_name,
+                   archetype, traits, superpower, shadow, motto, color, element,
+                   collaboration_style, avatar_url, raw_input, created_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (data["id"], data.get("team_id"), data["name"], data.get("role"),
+                 data["animal"], data.get("emoji", ""), data["soul_name"], data["archetype"],
+                 traits_str, data["superpower"], data["shadow"], data["motto"],
+                 data.get("color", "#00d4aa"), data.get("element", ""),
+                 data.get("collaboration_style", ""), data.get("avatar_url"),
+                 data.get("raw_input", ""), data["created_at"]),
+            )
+
+
+async def db_insert_team(data: dict) -> None:
+    if SUPABASE_ENABLED and db:
+        await db.insert("teams", data)
+    else:
+        with get_sqlite() as conn:
+            conn.execute(
+                "INSERT INTO teams (id, name, description, soul_count, synergy, created_at) VALUES (?,?,?,?,?,?)",
+                (data["id"], data["name"], data.get("description"),
+                 data["soul_count"], json.dumps(data["synergy"]), data["created_at"]),
+            )
+
+
+async def db_list_souls(limit: int = 50) -> list[dict]:
+    if SUPABASE_ENABLED and db:
+        return await db.select("souls", {"order": "created_at.desc", "limit": str(limit)})
+    with get_sqlite() as conn:
+        rows = conn.execute("SELECT * FROM souls ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
+    return [dict(r) for r in rows]
+
+
+async def db_get_soul(soul_id: str) -> dict | None:
+    if SUPABASE_ENABLED and db:
+        return await db.select_one("souls", "id", soul_id)
+    with get_sqlite() as conn:
+        row = conn.execute("SELECT * FROM souls WHERE id = ?", (soul_id,)).fetchone()
+    return dict(row) if row else None
+
+
+async def db_list_teams(limit: int = 20) -> list[dict]:
+    if SUPABASE_ENABLED and db:
+        return await db.select("teams", {"order": "created_at.desc", "limit": str(limit)})
+    with get_sqlite() as conn:
+        rows = conn.execute("SELECT * FROM teams ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
+    return [dict(r) for r in rows]
+
+
+async def db_get_team(team_id: str) -> dict | None:
+    if SUPABASE_ENABLED and db:
+        team = await db.select_one("teams", "id", team_id)
+        if not team:
+            return None
+        souls = await db.select("souls", {"team_id": f"eq.{team_id}", "order": "created_at"})
+        return {**team, "souls": souls}
+    with get_sqlite() as conn:
+        team = conn.execute("SELECT * FROM teams WHERE id = ?", (team_id,)).fetchone()
+        if not team:
+            return None
+        souls = conn.execute("SELECT * FROM souls WHERE team_id = ? ORDER BY created_at", (team_id,)).fetchall()
+    return {**dict(team), "souls": [dict(s) for s in souls]}
+
+
+async def db_count() -> tuple[int, int]:
+    if SUPABASE_ENABLED and db:
+        souls = await db.select("souls", {"select": "id", "limit": "0", "head": "true"})
+        teams = await db.select("teams", {"select": "id", "limit": "0", "head": "true"})
+        # PostgREST doesn't return count easily without range headers; use len as approximation
+        all_souls = await db.select("souls", {"select": "id"})
+        all_teams = await db.select("teams", {"select": "id"})
+        return len(all_souls), len(all_teams)
+    with get_sqlite() as conn:
+        sc = conn.execute("SELECT COUNT(*) FROM souls").fetchone()[0]
+        tc = conn.execute("SELECT COUNT(*) FROM teams").fetchone()[0]
+    return sc, tc
 
 
 # ---------------------------------------------------------------------------
@@ -88,11 +210,24 @@ def init_db():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
+    global db
+    if SUPABASE_ENABLED:
+        db = SupabaseClient(SUPABASE_URL, SUPABASE_KEY)
+    else:
+        init_sqlite()
     yield
+    if db:
+        await db.close()
 
 
-app = FastAPI(title="Spirit Animals API", version="0.2.1", lifespan=lifespan)
+app = FastAPI(title="Spirit Animals API", version="0.3.0", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # ---------------------------------------------------------------------------
@@ -191,7 +326,6 @@ class TeamResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 def _parse_claude_json(raw: str) -> dict:
-    """Pulisce e parsa la risposta JSON di Claude."""
     text = raw.strip()
     if text.startswith("```"):
         text = text.split("\n", 1)[1].rsplit("```", 1)[0]
@@ -199,7 +333,6 @@ def _parse_claude_json(raw: str) -> dict:
 
 
 def _call_claude(system: str, user_content: str) -> dict:
-    """Chiamata sincrona a Claude (da wrappare in asyncio.to_thread)."""
     message = claude.messages.create(
         model=CLAUDE_MODEL,
         max_tokens=1024,
@@ -210,12 +343,10 @@ def _call_claude(system: str, user_content: str) -> dict:
 
 
 async def generate_soul_profile(user_input: str) -> dict:
-    """Chiama Claude per generare il profilo Soul (non-blocking)."""
     return await asyncio.to_thread(_call_claude, SOUL_SYSTEM_PROMPT, user_input)
 
 
 async def generate_avatar(image_prompt: str, fallback_animal: str) -> str | None:
-    """Chiama fal.ai per generare l'avatar."""
     if not FAL_ENABLED:
         return None
     try:
@@ -248,29 +379,7 @@ def build_user_input(req: SoulRequest) -> str:
     return "\n".join(parts)
 
 
-def save_soul(soul_data: dict, soul_id: str, name: str, role: str | None,
-              raw_input: str, team_id: str | None = None) -> None:
-    with get_db() as conn:
-        conn.execute(
-            """INSERT INTO souls (id, team_id, name, role, animal, emoji, soul_name,
-               archetype, traits, superpower, shadow, motto, color, element,
-               collaboration_style, avatar_url, raw_input, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                soul_id, team_id, name, role,
-                soul_data["animal"], soul_data.get("emoji", ""),
-                soul_data["soul_name"], soul_data["archetype"],
-                json.dumps(soul_data["traits"]), soul_data["superpower"],
-                soul_data["shadow"], soul_data["motto"],
-                soul_data.get("color", "#00d4aa"), soul_data.get("element", ""),
-                soul_data.get("collaboration_style", ""),
-                soul_data.get("avatar_url"), raw_input,
-                datetime.now(timezone.utc).isoformat(),
-            ),
-        )
-
-
-def soul_to_response(soul_data: dict, soul_id: str, team_id: str | None = None) -> SoulResponse:
+def make_soul_response(soul_data: dict, soul_id: str, team_id: str | None = None) -> SoulResponse:
     traits = soul_data["traits"]
     if isinstance(traits, str):
         traits = json.loads(traits)
@@ -297,8 +406,7 @@ def soul_to_response(soul_data: dict, soul_id: str, team_id: str | None = None) 
 # ---------------------------------------------------------------------------
 
 @app.post("/api/generate-soul", response_model=SoulResponse)
-async def generate_soul(req: SoulRequest):
-    """Genera un profilo AI Soul completo con avatar."""
+async def api_generate_soul(req: SoulRequest):
     user_input = build_user_input(req)
 
     try:
@@ -308,19 +416,28 @@ async def generate_soul(req: SoulRequest):
     except anthropic.APIError as e:
         raise HTTPException(status_code=502, detail=f"Errore Claude API: {e}")
 
-    soul["avatar_url"] = await generate_avatar(
-        soul.get("image_prompt", ""), soul["animal"]
-    )
+    soul["avatar_url"] = await generate_avatar(soul.get("image_prompt", ""), soul["animal"])
 
     soul_id = str(uuid.uuid4())
-    save_soul(soul, soul_id, req.name, req.role, user_input)
+    now = datetime.now(timezone.utc).isoformat()
 
-    return soul_to_response(soul, soul_id)
+    await db_insert_soul({
+        "id": soul_id, "team_id": None, "name": req.name, "role": req.role,
+        "animal": soul["animal"], "emoji": soul.get("emoji", ""),
+        "soul_name": soul["soul_name"], "archetype": soul["archetype"],
+        "traits": soul["traits"], "superpower": soul["superpower"],
+        "shadow": soul["shadow"], "motto": soul["motto"],
+        "color": soul.get("color", "#00d4aa"), "element": soul.get("element", ""),
+        "collaboration_style": soul.get("collaboration_style", ""),
+        "avatar_url": soul.get("avatar_url"), "raw_input": user_input,
+        "created_at": now,
+    })
+
+    return make_soul_response(soul, soul_id)
 
 
 @app.post("/api/generate-team", response_model=TeamResponse)
-async def generate_team(req: TeamRequest):
-    """Genera un team completo di AI Souls con analisi sinergie."""
+async def api_generate_team(req: TeamRequest):
     if len(req.members) < 2:
         raise HTTPException(status_code=400, detail="Servono almeno 2 membri")
     if len(req.members) > 10:
@@ -331,16 +448,24 @@ async def generate_team(req: TeamRequest):
     async def process_member(member: SoulRequest) -> SoulResponse:
         user_input = build_user_input(member)
         soul = await generate_soul_profile(user_input)
-        soul["avatar_url"] = await generate_avatar(
-            soul.get("image_prompt", ""), soul["animal"]
-        )
+        soul["avatar_url"] = await generate_avatar(soul.get("image_prompt", ""), soul["animal"])
         soul_id = str(uuid.uuid4())
-        save_soul(soul, soul_id, member.name, member.role, user_input, team_id)
-        return soul_to_response(soul, soul_id, team_id)
+        now = datetime.now(timezone.utc).isoformat()
+        await db_insert_soul({
+            "id": soul_id, "team_id": team_id, "name": member.name, "role": member.role,
+            "animal": soul["animal"], "emoji": soul.get("emoji", ""),
+            "soul_name": soul["soul_name"], "archetype": soul["archetype"],
+            "traits": soul["traits"], "superpower": soul["superpower"],
+            "shadow": soul["shadow"], "motto": soul["motto"],
+            "color": soul.get("color", "#00d4aa"), "element": soul.get("element", ""),
+            "collaboration_style": soul.get("collaboration_style", ""),
+            "avatar_url": soul.get("avatar_url"), "raw_input": user_input,
+            "created_at": now,
+        })
+        return make_soul_response(soul, soul_id, team_id)
 
     souls = await asyncio.gather(*[process_member(m) for m in req.members])
 
-    # Analisi sinergie
     team_summary = "\n".join(
         f"- {s.emoji} {s.soul_name} ({s.animal}): {s.archetype}, superpotere={s.superpower}"
         for s in souls
@@ -352,83 +477,58 @@ async def generate_team(req: TeamRequest):
         )
     except (json.JSONDecodeError, anthropic.APIError):
         synergy = {
-            "team_name": req.team_name,
-            "synergy_score": 0,
-            "strengths": [],
-            "blind_spots": [],
-            "dynamic": "Analisi non disponibile",
-            "recommended_role_map": {},
-            "missing_archetype": "N/A",
+            "team_name": req.team_name, "synergy_score": 0, "strengths": [],
+            "blind_spots": [], "dynamic": "Analisi non disponibile",
+            "recommended_role_map": {}, "missing_archetype": "N/A",
         }
 
-    with get_db() as conn:
-        conn.execute(
-            "INSERT INTO teams (id, name, description, soul_count, synergy, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (team_id, req.team_name, None, len(souls), json.dumps(synergy),
-             datetime.now(timezone.utc).isoformat()),
-        )
+    now = datetime.now(timezone.utc).isoformat()
+    await db_insert_team({
+        "id": team_id, "name": req.team_name, "description": None,
+        "soul_count": len(souls), "synergy": synergy, "created_at": now,
+    })
 
     return TeamResponse(
-        team_id=team_id,
-        team_name=req.team_name,
-        souls=list(souls),
-        synergy=TeamSynergy(**synergy),
+        team_id=team_id, team_name=req.team_name,
+        souls=list(souls), synergy=TeamSynergy(**synergy),
     )
 
 
 @app.get("/api/souls")
-async def list_souls(limit: int = 50):
-    """Lista tutte le Souls generate."""
-    with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM souls ORDER BY created_at DESC LIMIT ?", (limit,)
-        ).fetchall()
-    return [dict(r) for r in rows]
+async def api_list_souls(limit: int = 50):
+    return await db_list_souls(limit)
 
 
 @app.get("/api/souls/{soul_id}")
-async def get_soul(soul_id: str):
-    """Recupera una Soul per ID."""
-    with get_db() as conn:
-        row = conn.execute("SELECT * FROM souls WHERE id = ?", (soul_id,)).fetchone()
-    if not row:
+async def api_get_soul(soul_id: str):
+    soul = await db_get_soul(soul_id)
+    if not soul:
         raise HTTPException(status_code=404, detail="Soul non trovata")
-    return dict(row)
+    return soul
 
 
 @app.get("/api/teams")
-async def list_teams(limit: int = 20):
-    """Lista tutti i team generati."""
-    with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM teams ORDER BY created_at DESC LIMIT ?", (limit,)
-        ).fetchall()
-    return [dict(r) for r in rows]
+async def api_list_teams(limit: int = 20):
+    return await db_list_teams(limit)
 
 
 @app.get("/api/teams/{team_id}")
-async def get_team(team_id: str):
-    """Recupera un team con tutte le sue Souls."""
-    with get_db() as conn:
-        team = conn.execute("SELECT * FROM teams WHERE id = ?", (team_id,)).fetchone()
-        if not team:
-            raise HTTPException(status_code=404, detail="Team non trovato")
-        souls = conn.execute(
-            "SELECT * FROM souls WHERE team_id = ? ORDER BY created_at", (team_id,)
-        ).fetchall()
-    return {**dict(team), "souls": [dict(s) for s in souls]}
+async def api_get_team(team_id: str):
+    team = await db_get_team(team_id)
+    if not team:
+        raise HTTPException(status_code=404, detail="Team non trovato")
+    return team
 
 
 @app.get("/api/health")
-async def health():
-    with get_db() as conn:
-        soul_count = conn.execute("SELECT COUNT(*) FROM souls").fetchone()[0]
-        team_count = conn.execute("SELECT COUNT(*) FROM teams").fetchone()[0]
+async def api_health():
+    soul_count, team_count = await db_count()
     return {
         "status": "alive",
-        "engine": "Spirit Animals v0.2.1",
+        "engine": "Spirit Animals v0.3.0",
         "model": CLAUDE_MODEL,
         "fal_enabled": FAL_ENABLED,
+        "storage": "supabase" if SUPABASE_ENABLED else "sqlite",
         "souls_generated": soul_count,
         "teams_generated": team_count,
     }
