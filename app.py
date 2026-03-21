@@ -9,7 +9,7 @@ import asyncio
 import sqlite3
 import uuid
 from datetime import datetime, timezone
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
@@ -24,15 +24,27 @@ if os.path.exists(os.path.expanduser("~/.config/credentials/aurahome.env")):
     load_dotenv(os.path.expanduser("~/.config/credentials/aurahome.env"))
     load_dotenv(os.path.expanduser("~/claude_voice/.env"))
 
-app = FastAPI(title="Spirit Animals API", version="0.2.0")
+CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-3-haiku-20240307")
+FAL_ENABLED = bool(os.getenv("FAL_KEY"))
+DB_PATH = os.getenv("DB_PATH", "spirit_animals.db")
 
 claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
-DB_PATH = os.getenv("DB_PATH", "spirit_animals.db")
 
 # ---------------------------------------------------------------------------
-# Database (SQLite per demo, migration SQL per Supabase inclusa)
+# Database
 # ---------------------------------------------------------------------------
+
+@contextmanager
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        yield conn
+        conn.commit()
+    finally:
+        conn.close()
+
 
 def init_db():
     with get_db() as conn:
@@ -70,15 +82,17 @@ def init_db():
         """)
 
 
-@contextmanager
-def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    try:
-        yield conn
-        conn.commit()
-    finally:
-        conn.close()
+# ---------------------------------------------------------------------------
+# Lifespan
+# ---------------------------------------------------------------------------
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
+
+app = FastAPI(title="Spirit Animals API", version="0.2.1", lifespan=lifespan)
 
 
 # ---------------------------------------------------------------------------
@@ -119,6 +133,7 @@ Dato un team di AI Souls, analizza le sinergie e genera un report JSON:
 }
 
 Rispondi SOLO con il JSON valido, nessun altro testo."""
+
 
 # ---------------------------------------------------------------------------
 # Models
@@ -175,23 +190,33 @@ class TeamResponse(BaseModel):
 # Core Engine
 # ---------------------------------------------------------------------------
 
-async def generate_soul_profile(user_input: str) -> dict:
-    """Chiama Claude per generare il profilo Soul."""
+def _parse_claude_json(raw: str) -> dict:
+    """Pulisce e parsa la risposta JSON di Claude."""
+    text = raw.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1].rsplit("```", 1)[0]
+    return json.loads(text)
+
+
+def _call_claude(system: str, user_content: str) -> dict:
+    """Chiamata sincrona a Claude (da wrappare in asyncio.to_thread)."""
     message = claude.messages.create(
-        model=os.getenv("CLAUDE_MODEL", "claude-3-haiku-20240307"),
+        model=CLAUDE_MODEL,
         max_tokens=1024,
-        system=SOUL_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": user_input}],
+        system=system,
+        messages=[{"role": "user", "content": user_content}],
     )
-    raw = message.content[0].text
-    if raw.startswith("```"):
-        raw = raw.split("\n", 1)[1].rsplit("```", 1)[0]
-    return json.loads(raw)
+    return _parse_claude_json(message.content[0].text)
+
+
+async def generate_soul_profile(user_input: str) -> dict:
+    """Chiama Claude per generare il profilo Soul (non-blocking)."""
+    return await asyncio.to_thread(_call_claude, SOUL_SYSTEM_PROMPT, user_input)
 
 
 async def generate_avatar(image_prompt: str, fallback_animal: str) -> str | None:
     """Chiama fal.ai per generare l'avatar."""
-    if not os.getenv("FAL_KEY"):
+    if not FAL_ENABLED:
         return None
     try:
         result = await asyncio.to_thread(
@@ -246,13 +271,16 @@ def save_soul(soul_data: dict, soul_id: str, name: str, role: str | None,
 
 
 def soul_to_response(soul_data: dict, soul_id: str, team_id: str | None = None) -> SoulResponse:
+    traits = soul_data["traits"]
+    if isinstance(traits, str):
+        traits = json.loads(traits)
     return SoulResponse(
         id=soul_id,
         animal=soul_data["animal"],
         emoji=soul_data.get("emoji", ""),
         soul_name=soul_data["soul_name"],
         archetype=soul_data["archetype"],
-        traits=soul_data["traits"] if isinstance(soul_data["traits"], list) else json.loads(soul_data["traits"]),
+        traits=traits,
         superpower=soul_data["superpower"],
         shadow=soul_data["shadow"],
         motto=soul_data["motto"],
@@ -293,10 +321,13 @@ async def generate_soul(req: SoulRequest):
 @app.post("/api/generate-team", response_model=TeamResponse)
 async def generate_team(req: TeamRequest):
     """Genera un team completo di AI Souls con analisi sinergie."""
-    team_id = str(uuid.uuid4())
-    souls: list[SoulResponse] = []
+    if len(req.members) < 2:
+        raise HTTPException(status_code=400, detail="Servono almeno 2 membri")
+    if len(req.members) > 10:
+        raise HTTPException(status_code=400, detail="Massimo 10 membri per team")
 
-    # Genera tutte le Souls in parallelo
+    team_id = str(uuid.uuid4())
+
     async def process_member(member: SoulRequest) -> SoulResponse:
         user_input = build_user_input(member)
         soul = await generate_soul_profile(user_input)
@@ -307,26 +338,18 @@ async def generate_team(req: TeamRequest):
         save_soul(soul, soul_id, member.name, member.role, user_input, team_id)
         return soul_to_response(soul, soul_id, team_id)
 
-    tasks = [process_member(m) for m in req.members]
-    souls = await asyncio.gather(*tasks)
+    souls = await asyncio.gather(*[process_member(m) for m in req.members])
 
-    # Analisi sinergie del team
+    # Analisi sinergie
     team_summary = "\n".join(
         f"- {s.emoji} {s.soul_name} ({s.animal}): {s.archetype}, superpotere={s.superpower}"
         for s in souls
     )
 
     try:
-        synergy_msg = claude.messages.create(
-            model=os.getenv("CLAUDE_MODEL", "claude-3-haiku-20240307"),
-            max_tokens=1024,
-            system=TEAM_SYNERGY_PROMPT,
-            messages=[{"role": "user", "content": f"Team '{req.team_name}':\n{team_summary}"}],
+        synergy = await asyncio.to_thread(
+            _call_claude, TEAM_SYNERGY_PROMPT, f"Team '{req.team_name}':\n{team_summary}"
         )
-        raw = synergy_msg.content[0].text
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1].rsplit("```", 1)[0]
-        synergy = json.loads(raw)
     except (json.JSONDecodeError, anthropic.APIError):
         synergy = {
             "team_name": req.team_name,
@@ -338,7 +361,6 @@ async def generate_team(req: TeamRequest):
             "missing_archetype": "N/A",
         }
 
-    # Salva team
     with get_db() as conn:
         conn.execute(
             "INSERT INTO teams (id, name, description, soul_count, synergy, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -404,21 +426,12 @@ async def health():
         team_count = conn.execute("SELECT COUNT(*) FROM teams").fetchone()[0]
     return {
         "status": "alive",
-        "engine": "Spirit Animals v0.2",
-        "stack": "FastAPI + Claude + fal.ai + SQLite",
-        "by": "Astra OS",
+        "engine": "Spirit Animals v0.2.1",
+        "model": CLAUDE_MODEL,
+        "fal_enabled": FAL_ENABLED,
         "souls_generated": soul_count,
         "teams_generated": team_count,
     }
-
-
-# ---------------------------------------------------------------------------
-# Startup
-# ---------------------------------------------------------------------------
-
-@app.on_event("startup")
-async def startup():
-    init_db()
 
 
 # Serve frontend
