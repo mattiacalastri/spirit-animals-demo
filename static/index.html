@@ -3,325 +3,763 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spirit Animals — AI Soul Generator</title>
+    <title>Spirit Animals — AI Soul Engine by Astra OS</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         :root {
-            --bg: #0a0f1a;
-            --surface: #111827;
-            --border: #1e293b;
+            --bg: #06090f;
+            --surface: #0d1117;
+            --surface-2: #151b23;
+            --border: #1c2333;
+            --border-hover: #2d3548;
             --teal: #00d4aa;
-            --teal-dim: #00d4aa33;
-            --text: #e2e8f0;
-            --text-dim: #64748b;
-            --glow: 0 0 30px #00d4aa22;
+            --teal-soft: #00d4aa18;
+            --teal-mid: #00d4aa40;
+            --amber: #f59e0b;
+            --text: #e6edf3;
+            --text-secondary: #8b949e;
+            --text-muted: #484f58;
+            --radius: 16px;
+            --radius-sm: 10px;
+            --glow: 0 0 40px #00d4aa15, 0 0 80px #00d4aa08;
         }
 
         body {
-            font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+            font-family: 'Inter', -apple-system, sans-serif;
             background: var(--bg);
             color: var(--text);
             min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            line-height: 1.6;
         }
 
-        header { text-align: center; padding: 3rem 1rem 1.5rem; }
-        header h1 { font-size: 2rem; font-weight: 300; letter-spacing: 0.15em; color: var(--teal); }
-        header p { color: var(--text-dim); font-size: 0.8rem; margin-top: 0.5rem; letter-spacing: 0.05em; }
+        /* ── Hero ── */
+        .hero {
+            text-align: center;
+            padding: 4rem 1.5rem 2rem;
+            position: relative;
+        }
 
-        .container { width: 100%; max-width: 960px; padding: 0 1.5rem; display: flex; flex-direction: column; gap: 2rem; }
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 50%;
+            transform: translateX(-50%);
+            width: 600px; height: 400px;
+            background: radial-gradient(ellipse, var(--teal-soft), transparent 70%);
+            pointer-events: none;
+        }
 
-        /* Tabs */
-        .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 100px;
+            font-size: 0.72rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            letter-spacing: 0.04em;
+            margin-bottom: 1.5rem;
+            background: var(--surface);
+        }
+
+        .hero-badge .dot {
+            width: 6px; height: 6px;
+            background: var(--teal);
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .hero h1 {
+            font-size: clamp(2rem, 5vw, 3.2rem);
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            line-height: 1.15;
+            margin-bottom: 1rem;
+            position: relative;
+        }
+
+        .hero h1 span {
+            background: linear-gradient(135deg, var(--teal), #00f5c8, var(--amber));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero p {
+            font-size: 1.05rem;
+            color: var(--text-secondary);
+            max-width: 520px;
+            margin: 0 auto;
+            font-weight: 300;
+        }
+
+        .hero-stack {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-top: 2rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .hero-stack span { color: var(--text-secondary); }
+
+        /* ── Layout ── */
+        .container {
+            width: 100%;
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+        }
+
+        /* ── Tabs ── */
+        .tabs {
+            display: flex;
+            gap: 0.25rem;
+            padding: 0.3rem;
+            background: var(--surface);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            margin-bottom: 2rem;
+        }
+
         .tab {
-            padding: 0.8rem 1.5rem; cursor: pointer; font-family: inherit; font-size: 0.75rem;
-            letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim);
-            background: transparent; border: none; border-bottom: 2px solid transparent;
+            flex: 1;
+            padding: 0.7rem 1rem;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            background: transparent;
+            border: none;
+            border-radius: 8px;
             transition: all 0.2s;
         }
-        .tab:hover { color: var(--text); }
-        .tab.active { color: var(--teal); border-bottom-color: var(--teal); }
-        .tab-panel { display: none; }
-        .tab-panel.active { display: block; }
 
-        /* Form */
-        .form-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; }
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .tab:hover { color: var(--text-secondary); }
+        .tab.active { color: var(--text); background: var(--surface-2); box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; animation: fadeUp 0.3s ease; }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── Cards ── */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 2rem;
+            transition: border-color 0.2s;
+        }
+
+        .card:hover { border-color: var(--border-hover); }
+
+        .card-label {
+            display: block;
+            font-size: 0.68rem;
+            font-weight: 600;
+            color: var(--teal);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+
+        /* ── Forms ── */
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.2rem;
+        }
+
         .form-grid .full { grid-column: 1 / -1; }
 
-        label { display: block; font-size: 0.7rem; color: var(--teal); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.4rem; }
-        input, textarea {
-            width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
-            padding: 0.75rem 1rem; color: var(--text); font-family: inherit; font-size: 0.85rem; transition: border-color 0.2s;
+        .field label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 0.4rem;
         }
-        input:focus, textarea:focus { outline: none; border-color: var(--teal); box-shadow: var(--glow); }
-        textarea { resize: vertical; min-height: 60px; }
 
-        .btn {
-            display: inline-flex; align-items: center; gap: 0.5rem; margin-top: 1.5rem;
-            padding: 0.85rem 2.5rem; background: transparent; border: 1px solid var(--teal);
-            color: var(--teal); font-family: inherit; font-size: 0.85rem; letter-spacing: 0.1em;
-            border-radius: 8px; cursor: pointer; transition: all 0.3s;
+        .field input, .field textarea {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 0.8rem 1rem;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.88rem;
+            transition: all 0.2s;
         }
-        .btn:hover { background: var(--teal); color: var(--bg); box-shadow: var(--glow); }
-        .btn:disabled { opacity: 0.4; cursor: wait; }
-        .btn-secondary { border-color: var(--text-dim); color: var(--text-dim); margin-top: 0.5rem; padding: 0.5rem 1.2rem; font-size: 0.75rem; }
-        .btn-secondary:hover { background: var(--text-dim); color: var(--bg); }
 
-        .spinner { display: none; width: 16px; height: 16px; border: 2px solid var(--teal-dim); border-top-color: var(--teal); border-radius: 50%; animation: spin 0.8s linear infinite; }
-        .btn:disabled .spinner { display: block; }
+        .field input:focus, .field textarea:focus {
+            outline: none;
+            border-color: var(--teal);
+            box-shadow: 0 0 0 3px var(--teal-soft);
+        }
+
+        .field input::placeholder, .field textarea::placeholder {
+            color: var(--text-muted);
+        }
+
+        .field textarea { resize: vertical; min-height: 70px; }
+
+        /* ── Buttons ── */
+        .btn-primary {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.6rem;
+            margin-top: 1.8rem;
+            padding: 0.9rem 2.5rem;
+            background: var(--teal);
+            border: none;
+            color: var(--bg);
+            font-family: inherit;
+            font-size: 0.88rem;
+            font-weight: 600;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all 0.2s;
+            min-width: 200px;
+        }
+
+        .btn-primary:hover { filter: brightness(1.1); box-shadow: var(--glow); }
+        .btn-primary:disabled { opacity: 0.5; cursor: wait; }
+
+        .btn-ghost {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.6rem 1.2rem;
+            background: transparent;
+            border: 1px dashed var(--border);
+            color: var(--text-muted);
+            font-family: inherit;
+            font-size: 0.78rem;
+            font-weight: 500;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 0.8rem;
+        }
+
+        .btn-ghost:hover { border-color: var(--teal); color: var(--teal); }
+
+        .spinner {
+            display: none;
+            width: 16px; height: 16px;
+            border: 2px solid rgba(0,0,0,0.2);
+            border-top-color: var(--bg);
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        .btn-primary:disabled .spinner { display: block; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* Result single */
+        /* ── Soul Result ── */
         .result-card {
-            display: none; background: var(--surface); border: 1px solid var(--border);
-            border-radius: 12px; overflow: hidden; animation: fadeIn 0.5s ease;
+            display: none;
+            margin-top: 2rem;
+            animation: fadeUp 0.5s ease;
         }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        .result-header { display: flex; align-items: center; gap: 1.5rem; padding: 2rem; border-bottom: 1px solid var(--border); }
-        .avatar-wrap {
-            width: 120px; height: 120px; border-radius: 50%; overflow: hidden;
-            border: 2px solid var(--teal); flex-shrink: 0; background: var(--bg);
-            display: flex; align-items: center; justify-content: center; font-size: 3rem;
+        .soul-hero {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+            padding: 2.5rem;
+            border-bottom: 1px solid var(--border);
         }
-        .avatar-wrap img { width: 100%; height: 100%; object-fit: cover; }
 
-        .soul-title .emoji { font-size: 1.5rem; }
-        .soul-title .name { font-size: 1.4rem; font-weight: 600; color: var(--teal); }
-        .soul-title .animal { font-size: 0.85rem; color: var(--text-dim); margin-top: 0.2rem; }
-        .soul-title .motto { font-style: italic; font-size: 0.8rem; color: var(--text); margin-top: 0.6rem; opacity: 0.8; }
-
-        .result-body { padding: 2rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
-        .stat-block h3 { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--teal); margin-bottom: 0.4rem; }
-        .stat-block p { font-size: 0.85rem; line-height: 1.5; }
-        .traits-list { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-        .trait-tag { padding: 0.3rem 0.7rem; border-radius: 20px; font-size: 0.75rem; border: 1px solid var(--border); background: var(--bg); }
-
-        /* Team result */
-        .team-result { display: none; animation: fadeIn 0.5s ease; }
-        .team-header {
-            background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
-            padding: 2rem; margin-bottom: 1rem; text-align: center;
+        .soul-avatar {
+            width: 130px; height: 130px;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 3px solid var(--teal-mid);
+            flex-shrink: 0;
+            background: var(--bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3.5rem;
+            box-shadow: 0 0 40px var(--teal-soft);
         }
-        .team-header h2 { color: var(--teal); font-size: 1.2rem; font-weight: 400; letter-spacing: 0.1em; }
-        .synergy-score {
-            display: inline-block; margin: 1rem 0; font-size: 3rem; font-weight: 700;
-            background: linear-gradient(135deg, var(--teal), #f59e0b); -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent; background-clip: text;
-        }
-        .synergy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; text-align: left; }
-        .synergy-grid .stat-block { background: var(--bg); border-radius: 8px; padding: 1rem; }
 
-        .team-souls { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
-        .soul-card {
-            background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
-            padding: 1.5rem; transition: border-color 0.2s;
-        }
-        .soul-card:hover { border-color: var(--teal); }
-        .soul-card-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
-        .soul-card-avatar {
-            width: 60px; height: 60px; border-radius: 50%; overflow: hidden;
-            border: 2px solid var(--border); flex-shrink: 0; background: var(--bg);
-            display: flex; align-items: center; justify-content: center; font-size: 1.5rem;
-        }
-        .soul-card-avatar img { width: 100%; height: 100%; object-fit: cover; }
-        .soul-card-name { font-size: 1rem; font-weight: 600; color: var(--teal); }
-        .soul-card-animal { font-size: 0.75rem; color: var(--text-dim); }
-        .soul-card-motto { font-style: italic; font-size: 0.75rem; opacity: 0.7; margin-top: 0.5rem; }
-        .soul-card-detail { font-size: 0.75rem; color: var(--text-dim); margin-top: 0.3rem; }
-        .soul-card-detail span { color: var(--text); }
+        .soul-avatar img { width: 100%; height: 100%; object-fit: cover; }
 
-        /* Member inputs */
+        .soul-info h2 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .soul-info .animal-line {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-top: 0.2rem;
+        }
+
+        .soul-info .motto-line {
+            font-style: italic;
+            font-size: 0.9rem;
+            color: var(--text);
+            margin-top: 0.8rem;
+            opacity: 0.75;
+            border-left: 2px solid var(--teal-mid);
+            padding-left: 0.8rem;
+        }
+
+        .soul-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+        }
+
+        .soul-stat {
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--border);
+            border-right: 1px solid var(--border);
+        }
+
+        .soul-stat:nth-child(2n) { border-right: none; }
+        .soul-stat:nth-last-child(-n+2) { border-bottom: none; }
+
+        .soul-stat h4 {
+            font-size: 0.65rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: 0.4rem;
+        }
+
+        .soul-stat p { font-size: 0.9rem; }
+
+        .soul-stat.full-span {
+            grid-column: 1 / -1;
+            border-right: none;
+        }
+
+        .trait-tags { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+
+        .trait-tag {
+            padding: 0.35rem 0.85rem;
+            border-radius: 100px;
+            font-size: 0.78rem;
+            font-weight: 500;
+            border: 1px solid var(--border);
+            background: var(--surface-2);
+            color: var(--text-secondary);
+        }
+
+        /* ── Team Result ── */
+        .team-result { display: none; margin-top: 2rem; animation: fadeUp 0.5s ease; }
+
+        .synergy-banner {
+            text-align: center;
+            padding: 2.5rem 2rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .synergy-banner h2 {
+            font-size: 1.3rem;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+        }
+
+        .synergy-number {
+            display: inline-block;
+            margin: 1rem 0 0.3rem;
+            font-size: 4rem;
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            background: linear-gradient(135deg, var(--teal), var(--amber));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .synergy-label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        .synergy-dynamic {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-top: 1rem;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .synergy-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+        }
+
+        .synergy-detail {
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--border);
+            border-right: 1px solid var(--border);
+        }
+
+        .synergy-detail:nth-child(2n) { border-right: none; }
+        .synergy-detail:nth-last-child(-n+2) { border-bottom: none; }
+
+        .synergy-detail h4 {
+            font-size: 0.65rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: 0.6rem;
+        }
+
+        .synergy-detail p, .synergy-detail li {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.7;
+        }
+
+        .synergy-detail ul { list-style: none; }
+        .synergy-detail li::before { content: '+ '; color: var(--teal); font-weight: 600; }
+        .synergy-detail li.blind::before { content: '- '; color: var(--amber); }
+
+        .team-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+            gap: 1rem;
+            padding: 1.5rem;
+        }
+
+        .mini-card {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 1.5rem;
+            transition: all 0.2s;
+        }
+
+        .mini-card:hover { border-color: var(--teal-mid); transform: translateY(-2px); }
+
+        .mini-card-head {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            margin-bottom: 1rem;
+        }
+
+        .mini-avatar {
+            width: 52px; height: 52px;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 2px solid var(--border);
+            flex-shrink: 0;
+            background: var(--bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+        }
+
+        .mini-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .mini-name { font-weight: 600; font-size: 0.95rem; }
+        .mini-sub { font-size: 0.75rem; color: var(--text-muted); }
+        .mini-detail { font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.25rem; }
+        .mini-detail b { color: var(--text-muted); font-weight: 500; }
+        .mini-motto { font-style: italic; font-size: 0.78rem; opacity: 0.6; margin-top: 0.6rem; }
+
+        /* ── Member Rows ── */
         .member-row {
-            background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
-            padding: 1rem; margin-bottom: 0.8rem; position: relative;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 1.2rem;
+            margin-bottom: 0.6rem;
+            position: relative;
         }
+
         .member-row .remove-btn {
-            position: absolute; top: 0.5rem; right: 0.5rem; background: none; border: none;
-            color: var(--text-dim); cursor: pointer; font-size: 1rem; padding: 0.2rem 0.5rem;
+            position: absolute; top: 0.6rem; right: 0.8rem;
+            background: none; border: none;
+            color: var(--text-muted); cursor: pointer;
+            font-size: 0.85rem; padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            transition: all 0.2s;
         }
-        .member-row .remove-btn:hover { color: #ef4444; }
-        .member-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+
+        .member-row .remove-btn:hover { color: #f85149; background: #f8514915; }
+
+        .member-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.6rem;
+        }
+
         .member-grid .full { grid-column: 1 / -1; }
-        .member-grid input { font-size: 0.8rem; padding: 0.5rem 0.75rem; }
+        .member-grid input { font-size: 0.82rem; padding: 0.6rem 0.8rem; }
 
-        /* API section */
-        .api-section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; margin-bottom: 3rem; }
-        .api-section h2 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--teal); margin-bottom: 1rem; }
-        pre {
-            background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
-            padding: 1.2rem; font-size: 0.78rem; line-height: 1.6; overflow-x: auto; color: var(--text-dim);
+        /* ── API Docs ── */
+        .api-card { margin-bottom: 1rem; }
+
+        .api-card h3 {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
-        pre .key { color: var(--teal); }
-        pre .str { color: #f59e0b; }
-        pre .comment { color: #475569; }
-        pre + pre { margin-top: 1rem; }
 
-        footer { text-align: center; padding: 2rem; color: var(--text-dim); font-size: 0.7rem; letter-spacing: 0.05em; }
+        .api-method {
+            display: inline-block;
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
 
-        @media (max-width: 600px) {
-            .form-grid, .result-body, .member-grid, .synergy-grid { grid-template-columns: 1fr; }
-            .result-header { flex-direction: column; text-align: center; }
-            .team-souls { grid-template-columns: 1fr; }
+        .api-method.post { background: #238636; color: #fff; }
+        .api-method.get { background: #1f6feb; color: #fff; }
+
+        pre {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 1.2rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.78rem;
+            line-height: 1.7;
+            overflow-x: auto;
+            color: var(--text-secondary);
+        }
+
+        pre .k { color: var(--teal); }
+        pre .s { color: var(--amber); }
+        pre .c { color: var(--text-muted); }
+        pre + pre { margin-top: 0.8rem; }
+
+        /* ── Footer ── */
+        footer {
+            text-align: center;
+            padding: 3rem 1.5rem;
+            margin-top: 3rem;
+            border-top: 1px solid var(--border);
+        }
+
+        footer p {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: 500;
+            letter-spacing: 0.05em;
+        }
+
+        footer .mission {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            font-style: italic;
+            margin-bottom: 0.5rem;
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 640px) {
+            .form-grid, .member-grid, .soul-grid, .synergy-details { grid-template-columns: 1fr; }
+            .soul-hero { flex-direction: column; text-align: center; }
+            .soul-info .motto-line { border-left: none; padding-left: 0; text-align: center; }
+            .team-grid { grid-template-columns: 1fr; }
+            .soul-stat, .synergy-detail { border-right: none !important; }
+            .hero-stack { flex-direction: column; gap: 0.5rem; }
         }
     </style>
 </head>
 <body>
-    <header>
-        <h1>SPIRIT ANIMALS</h1>
-        <p>AI Soul Generator &mdash; powered by Claude + fal.ai</p>
-    </header>
+    <div class="hero">
+        <div class="hero-badge">
+            <span class="dot"></span>
+            Engine live &mdash; Astra OS
+        </div>
+        <h1>Scopri la tua <span>AI Soul</span></h1>
+        <p>Ogni persona ha un animale spirito. Un archetipo. Un superpotere nascosto. Questo engine lo rivela.</p>
+        <div class="hero-stack">
+            <span>Claude AI</span> + <span>fal.ai</span> + <span>FastAPI</span>
+        </div>
+    </div>
 
     <div class="container">
-        <!-- Tabs -->
         <div class="tabs">
             <button class="tab active" data-tab="single">Singola Soul</button>
             <button class="tab" data-tab="team">Team Batch</button>
-            <button class="tab" data-tab="api">API Docs</button>
+            <button class="tab" data-tab="api">API Reference</button>
         </div>
 
-        <!-- TAB 1: Single Soul -->
+        <!-- ═══ TAB 1: Singola Soul ═══ -->
         <div class="tab-panel active" id="tab-single">
-            <div class="form-card">
+            <div class="card">
+                <span class="card-label">Genera una Soul</span>
                 <form id="soulForm">
                     <div class="form-grid">
-                        <div>
+                        <div class="field">
                             <label>Nome</label>
-                            <input type="text" id="name" placeholder="es. Marco" required>
+                            <input type="text" id="name" placeholder="Marco" required>
                         </div>
-                        <div>
+                        <div class="field">
                             <label>Ruolo</label>
-                            <input type="text" id="role" placeholder="es. Full Stack Developer">
+                            <input type="text" id="role" placeholder="Full Stack Developer">
                         </div>
-                        <div class="full">
+                        <div class="field full">
                             <label>Tratti</label>
-                            <input type="text" id="traits" placeholder="es. curioso, resiliente, silenzioso leader">
+                            <input type="text" id="traits" placeholder="curioso, resiliente, silenzioso leader">
                         </div>
-                        <div class="full">
+                        <div class="field full">
                             <label>Valori</label>
-                            <input type="text" id="values" placeholder="es. liberta, artigianato, impatto reale">
+                            <input type="text" id="values" placeholder="liberta, artigianato, impatto reale">
                         </div>
-                        <div class="full">
-                            <label>Contesto (opzionale)</label>
-                            <textarea id="context" placeholder="es. sta costruendo una startup AI dopo 10 anni in corporate"></textarea>
+                        <div class="field full">
+                            <label>Contesto <span style="color:var(--text-muted)">(opzionale)</span></label>
+                            <textarea id="context" placeholder="sta costruendo una startup AI dopo 10 anni in corporate"></textarea>
                         </div>
                     </div>
-                    <button type="submit" class="btn" id="submitBtn">
+                    <button type="submit" class="btn-primary" id="submitBtn">
                         <span class="spinner"></span>
-                        <span class="btn-text">GENERA SOUL</span>
+                        <span class="btn-text">Genera Soul</span>
                     </button>
                 </form>
             </div>
 
-            <div class="result-card" id="resultCard">
-                <div class="result-header">
-                    <div class="avatar-wrap" id="avatarWrap"><span id="avatarFallback"></span></div>
-                    <div class="soul-title">
-                        <div><span class="emoji" id="resEmoji"></span> <span class="name" id="resSoulName"></span></div>
-                        <div class="animal" id="resAnimal"></div>
-                        <div class="motto" id="resMotto"></div>
+            <div class="result-card card" id="resultCard" style="padding:0;">
+                <div class="soul-hero">
+                    <div class="soul-avatar" id="avatarWrap"><span id="avatarFallback"></span></div>
+                    <div class="soul-info">
+                        <h2><span id="resEmoji"></span> <span id="resSoulName"></span></h2>
+                        <div class="animal-line" id="resAnimal"></div>
+                        <div class="motto-line" id="resMotto"></div>
                     </div>
                 </div>
-                <div class="result-body">
-                    <div class="stat-block"><h3>Archetipo</h3><p id="resArchetype"></p></div>
-                    <div class="stat-block"><h3>Elemento</h3><p id="resElement"></p></div>
-                    <div class="stat-block"><h3>Superpotere</h3><p id="resSuperpower"></p></div>
-                    <div class="stat-block"><h3>Ombra</h3><p id="resShadow"></p></div>
-                    <div class="stat-block full-width"><h3>Tratti</h3><div class="traits-list" id="resTraits"></div></div>
-                    <div class="stat-block full-width"><h3>Stile di collaborazione</h3><p id="resCollab"></p></div>
+                <div class="soul-grid">
+                    <div class="soul-stat"><h4>Archetipo</h4><p id="resArchetype"></p></div>
+                    <div class="soul-stat"><h4>Elemento</h4><p id="resElement"></p></div>
+                    <div class="soul-stat"><h4>Superpotere</h4><p id="resSuperpower"></p></div>
+                    <div class="soul-stat"><h4>Ombra</h4><p id="resShadow"></p></div>
+                    <div class="soul-stat full-span"><h4>Tratti</h4><div class="trait-tags" id="resTraits"></div></div>
+                    <div class="soul-stat full-span"><h4>Stile di collaborazione</h4><p id="resCollab"></p></div>
                 </div>
             </div>
         </div>
 
-        <!-- TAB 2: Team Batch -->
+        <!-- ═══ TAB 2: Team Batch ═══ -->
         <div class="tab-panel" id="tab-team">
-            <div class="form-card">
-                <div style="margin-bottom: 1rem;">
+            <div class="card">
+                <span class="card-label">Genera un team</span>
+                <div class="field" style="margin-bottom:1.2rem;">
                     <label>Nome del Team</label>
-                    <input type="text" id="teamName" placeholder="es. Astra Core Team" required>
+                    <input type="text" id="teamName" placeholder="Astra Core Team">
                 </div>
                 <div id="membersContainer"></div>
-                <button type="button" class="btn-secondary btn" id="addMemberBtn" style="margin-top: 0.8rem;">+ AGGIUNGI MEMBRO</button>
+                <button type="button" class="btn-ghost" id="addMemberBtn">+ Aggiungi membro</button>
                 <br>
-                <button type="button" class="btn" id="teamSubmitBtn">
+                <button type="button" class="btn-primary" id="teamSubmitBtn">
                     <span class="spinner"></span>
-                    <span class="btn-text">GENERA TEAM</span>
+                    <span class="btn-text">Genera Team</span>
                 </button>
             </div>
 
-            <div class="team-result" id="teamResult">
-                <div class="team-header">
+            <div class="team-result card" id="teamResult" style="padding:0;">
+                <div class="synergy-banner">
                     <h2 id="teamResName"></h2>
-                    <div class="synergy-score" id="teamSynergyScore"></div>
-                    <div style="font-size: 0.75rem; color: var(--text-dim);">SYNERGY SCORE</div>
-                    <p style="margin-top: 1rem; font-size: 0.85rem;" id="teamDynamic"></p>
-                    <div class="synergy-grid">
-                        <div class="stat-block"><h3>Punti di forza</h3><div id="teamStrengths"></div></div>
-                        <div class="stat-block"><h3>Punti ciechi</h3><div id="teamBlindSpots"></div></div>
-                        <div class="stat-block"><h3>Mappa ruoli</h3><div id="teamRoleMap"></div></div>
-                        <div class="stat-block"><h3>Archetipo mancante</h3><p id="teamMissing"></p></div>
-                    </div>
+                    <div class="synergy-number" id="teamSynergyScore"></div>
+                    <div class="synergy-label">Synergy Score</div>
+                    <p class="synergy-dynamic" id="teamDynamic"></p>
                 </div>
-                <div class="team-souls" id="teamSouls"></div>
+                <div class="synergy-details">
+                    <div class="synergy-detail"><h4>Punti di forza</h4><ul id="teamStrengths"></ul></div>
+                    <div class="synergy-detail"><h4>Punti ciechi</h4><ul id="teamBlindSpots"></ul></div>
+                    <div class="synergy-detail"><h4>Mappa ruoli</h4><div id="teamRoleMap"></div></div>
+                    <div class="synergy-detail"><h4>Archetipo mancante</h4><p id="teamMissing"></p></div>
+                </div>
+                <div class="team-grid" id="teamSouls"></div>
             </div>
         </div>
 
-        <!-- TAB 3: API Docs -->
+        <!-- ═══ TAB 3: API Docs ═══ -->
         <div class="tab-panel" id="tab-api">
-            <div class="api-section">
-                <h2>Singola Soul</h2>
-                <pre><span class="comment"># POST /api/generate-soul</span>
+            <div class="card api-card">
+                <h3><span class="api-method post">POST</span> /api/generate-soul</h3>
+                <pre><span class="c"># Genera una singola AI Soul</span>
 curl -X POST /api/generate-soul \
   -H "Content-Type: application/json" \
   -d '{
-    <span class="key">"name"</span>: <span class="str">"Marco"</span>,
-    <span class="key">"role"</span>: <span class="str">"Full Stack Developer"</span>,
-    <span class="key">"traits"</span>: <span class="str">"curioso, resiliente"</span>,
-    <span class="key">"values"</span>: <span class="str">"liberta, artigianato"</span>
+    <span class="k">"name"</span>: <span class="s">"Marco"</span>,
+    <span class="k">"role"</span>: <span class="s">"Full Stack Developer"</span>,
+    <span class="k">"traits"</span>: <span class="s">"curioso, resiliente"</span>,
+    <span class="k">"values"</span>: <span class="s">"liberta, artigianato"</span>
   }'</pre>
             </div>
-            <div class="api-section">
-                <h2>Team Batch (genera N souls + analisi sinergie)</h2>
-                <pre><span class="comment"># POST /api/generate-team</span>
+            <div class="card api-card">
+                <h3><span class="api-method post">POST</span> /api/generate-team</h3>
+                <pre><span class="c"># Genera N souls in parallelo + analisi sinergie</span>
 curl -X POST /api/generate-team \
   -H "Content-Type: application/json" \
   -d '{
-    <span class="key">"team_name"</span>: <span class="str">"Astra Core"</span>,
-    <span class="key">"members"</span>: [
-      {<span class="key">"name"</span>: <span class="str">"Mattia"</span>, <span class="key">"role"</span>: <span class="str">"CEO"</span>, <span class="key">"traits"</span>: <span class="str">"visionario, forgiatore"</span>},
-      {<span class="key">"name"</span>: <span class="str">"Marco"</span>, <span class="key">"role"</span>: <span class="str">"CTO"</span>, <span class="key">"traits"</span>: <span class="str">"pragmatico, designer"</span>},
-      {<span class="key">"name"</span>: <span class="str">"Roberto"</span>, <span class="key">"role"</span>: <span class="str">"Dev"</span>, <span class="key">"traits"</span>: <span class="str">"leale, veloce"</span>}
+    <span class="k">"team_name"</span>: <span class="s">"Astra Core"</span>,
+    <span class="k">"members"</span>: [
+      {<span class="k">"name"</span>: <span class="s">"Mattia"</span>, <span class="k">"role"</span>: <span class="s">"CEO"</span>, <span class="k">"traits"</span>: <span class="s">"visionario, forgiatore"</span>},
+      {<span class="k">"name"</span>: <span class="s">"Marco"</span>, <span class="k">"role"</span>: <span class="s">"CTO"</span>, <span class="k">"traits"</span>: <span class="s">"pragmatico, designer"</span>},
+      {<span class="k">"name"</span>: <span class="s">"Roberto"</span>, <span class="k">"role"</span>: <span class="s">"Dev"</span>, <span class="k">"traits"</span>: <span class="s">"leale, veloce"</span>}
     ]
   }'</pre>
             </div>
-            <div class="api-section">
-                <h2>Query</h2>
-                <pre><span class="comment"># Lista tutte le souls</span>
-GET /api/souls?limit=50
+            <div class="card api-card">
+                <h3><span class="api-method get">GET</span> Query Endpoints</h3>
+                <pre><span class="c"># Tutte le souls generate</span>
+<span class="k">GET</span> /api/souls?limit=50
 
-<span class="comment"># Singola soul per ID</span>
-GET /api/souls/{id}
+<span class="c"># Soul per ID</span>
+<span class="k">GET</span> /api/souls/{id}
 
-<span class="comment"># Lista team</span>
-GET /api/teams
+<span class="c"># Tutti i team</span>
+<span class="k">GET</span> /api/teams
 
-<span class="comment"># Team con souls</span>
-GET /api/teams/{team_id}
+<span class="c"># Team con souls e sinergie</span>
+<span class="k">GET</span> /api/teams/{team_id}
 
-<span class="comment"># Health check</span>
-GET /api/health</pre>
+<span class="c"># Health + contatori</span>
+<span class="k">GET</span> /api/health</pre>
             </div>
         </div>
     </div>
 
-    <footer>ASTRA OS &mdash; Spirit Animals Engine v0.2</footer>
+    <footer>
+        <p class="mission">"Ogni persona ha un'anima digitale. Noi la riveliamo."</p>
+        <p>Spirit Animals Engine v0.2 &mdash; Astra OS</p>
+    </footer>
 
     <script>
-        // Tabs
+        // ── Tabs ──
         document.querySelectorAll('.tab').forEach(tab => {
             tab.addEventListener('click', () => {
                 document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -331,7 +769,7 @@ GET /api/health</pre>
             });
         });
 
-        // ---- Single Soul ----
+        // ── Single Soul ──
         const form = document.getElementById('soulForm');
         const btn = document.getElementById('submitBtn');
         const result = document.getElementById('resultCard');
@@ -339,7 +777,7 @@ GET /api/health</pre>
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             btn.disabled = true;
-            btn.querySelector('.btn-text').textContent = 'GENERANDO...';
+            btn.querySelector('.btn-text').textContent = 'Generando...';
             result.style.display = 'none';
 
             const body = {
@@ -357,21 +795,20 @@ GET /api/health</pre>
                     body: JSON.stringify(body),
                 });
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const soul = await res.json();
-                renderSingleSoul(soul);
+                renderSoul(await res.json());
             } catch (err) {
                 alert('Errore: ' + err.message);
             } finally {
                 btn.disabled = false;
-                btn.querySelector('.btn-text').textContent = 'GENERA SOUL';
+                btn.querySelector('.btn-text').textContent = 'Genera Soul';
             }
         });
 
-        function renderSingleSoul(soul) {
+        function renderSoul(soul) {
             document.getElementById('resEmoji').textContent = soul.emoji;
             document.getElementById('resSoulName').textContent = soul.soul_name;
-            document.getElementById('resAnimal').textContent = soul.animal;
-            document.getElementById('resMotto').textContent = `"${soul.motto}"`;
+            document.getElementById('resAnimal').textContent = `${soul.animal} / ${soul.element}`;
+            document.getElementById('resMotto').textContent = soul.motto;
             document.getElementById('resArchetype').textContent = soul.archetype;
             document.getElementById('resElement').textContent = soul.element;
             document.getElementById('resSuperpower').textContent = soul.superpower;
@@ -388,36 +825,32 @@ GET /api/health</pre>
             });
 
             const wrap = document.getElementById('avatarWrap');
-            if (soul.avatar_url) {
-                wrap.innerHTML = `<img src="${soul.avatar_url}" alt="${soul.animal}">`;
-            } else {
-                wrap.innerHTML = `<span>${soul.emoji}</span>`;
-            }
+            wrap.innerHTML = soul.avatar_url
+                ? `<img src="${soul.avatar_url}" alt="${soul.animal}">`
+                : `<span>${soul.emoji}</span>`;
 
             result.style.display = 'block';
             result.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
-        // ---- Team Batch ----
+        // ── Team ──
         let memberCount = 0;
-        const membersContainer = document.getElementById('membersContainer');
+        const mc = document.getElementById('membersContainer');
 
         function addMember() {
             memberCount++;
             const div = document.createElement('div');
             div.className = 'member-row';
-            div.id = `member-${memberCount}`;
             div.innerHTML = `
                 <button type="button" class="remove-btn" onclick="this.parentElement.remove()">x</button>
                 <div class="member-grid">
-                    <div><label>Nome</label><input type="text" class="m-name" placeholder="Nome" required></div>
-                    <div><label>Ruolo</label><input type="text" class="m-role" placeholder="Ruolo"></div>
-                    <div class="full"><label>Tratti</label><input type="text" class="m-traits" placeholder="Tratti chiave"></div>
+                    <div class="field"><label>Nome</label><input type="text" class="m-name" placeholder="Nome" required></div>
+                    <div class="field"><label>Ruolo</label><input type="text" class="m-role" placeholder="Ruolo"></div>
+                    <div class="field full"><label>Tratti</label><input type="text" class="m-traits" placeholder="Tratti chiave"></div>
                 </div>`;
-            membersContainer.appendChild(div);
+            mc.appendChild(div);
         }
 
-        // Start with 3 members
         addMember(); addMember(); addMember();
         document.getElementById('addMemberBtn').addEventListener('click', addMember);
 
@@ -426,21 +859,20 @@ GET /api/health</pre>
             const teamName = document.getElementById('teamName').value;
             if (!teamName) { alert('Inserisci il nome del team'); return; }
 
-            const rows = membersContainer.querySelectorAll('.member-row');
             const members = [];
-            for (const row of rows) {
+            mc.querySelectorAll('.member-row').forEach(row => {
                 const name = row.querySelector('.m-name').value;
-                if (!name) continue;
+                if (!name) return;
                 members.push({
                     name,
                     role: row.querySelector('.m-role').value || null,
                     traits: row.querySelector('.m-traits').value || null,
                 });
-            }
+            });
             if (members.length < 2) { alert('Servono almeno 2 membri'); return; }
 
             teamBtn.disabled = true;
-            teamBtn.querySelector('.btn-text').textContent = `GENERANDO ${members.length} SOULS...`;
+            teamBtn.querySelector('.btn-text').textContent = `Generando ${members.length} souls...`;
             document.getElementById('teamResult').style.display = 'none';
 
             try {
@@ -450,53 +882,54 @@ GET /api/health</pre>
                     body: JSON.stringify({ team_name: teamName, members }),
                 });
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const team = await res.json();
-                renderTeam(team);
+                renderTeam(await res.json());
             } catch (err) {
                 alert('Errore: ' + err.message);
             } finally {
                 teamBtn.disabled = false;
-                teamBtn.querySelector('.btn-text').textContent = 'GENERA TEAM';
+                teamBtn.querySelector('.btn-text').textContent = 'Genera Team';
             }
         });
 
         function renderTeam(team) {
-            document.getElementById('teamResName').textContent = team.synergy.team_name || team.team_name;
-            document.getElementById('teamSynergyScore').textContent = team.synergy.synergy_score;
-            document.getElementById('teamDynamic').textContent = team.synergy.dynamic;
-            document.getElementById('teamMissing').textContent = team.synergy.missing_archetype;
+            const s = team.synergy;
+            document.getElementById('teamResName').textContent = s.team_name || team.team_name;
+            document.getElementById('teamSynergyScore').textContent = s.synergy_score;
+            document.getElementById('teamDynamic').textContent = s.dynamic;
+            document.getElementById('teamMissing').textContent = s.missing_archetype;
 
-            const strengthsEl = document.getElementById('teamStrengths');
-            strengthsEl.innerHTML = (team.synergy.strengths || []).map(s => `<p style="font-size:0.8rem;">+ ${s}</p>`).join('');
+            document.getElementById('teamStrengths').innerHTML =
+                (s.strengths || []).map(x => `<li>${x}</li>`).join('');
+            document.getElementById('teamBlindSpots').innerHTML =
+                (s.blind_spots || []).map(x => `<li class="blind">${x}</li>`).join('');
 
-            const blindEl = document.getElementById('teamBlindSpots');
-            blindEl.innerHTML = (team.synergy.blind_spots || []).map(s => `<p style="font-size:0.8rem;">- ${s}</p>`).join('');
-
-            const roleMapEl = document.getElementById('teamRoleMap');
-            const rm = team.synergy.recommended_role_map || {};
-            roleMapEl.innerHTML = Object.entries(rm).map(([k, v]) => `<p style="font-size:0.8rem;">${k}: <span style="color:var(--teal)">${v}</span></p>`).join('');
+            const rm = s.recommended_role_map || {};
+            document.getElementById('teamRoleMap').innerHTML =
+                Object.entries(rm).map(([k, v]) =>
+                    `<p style="font-size:0.85rem;color:var(--text-secondary)">${k}: <span style="color:var(--teal);font-weight:500">${v}</span></p>`
+                ).join('');
 
             const soulsEl = document.getElementById('teamSouls');
             soulsEl.innerHTML = '';
-            for (const soul of team.souls) {
-                const card = document.createElement('div');
-                card.className = 'soul-card';
+            team.souls.forEach(soul => {
                 const avatarHtml = soul.avatar_url
                     ? `<img src="${soul.avatar_url}" alt="${soul.animal}">`
                     : `<span>${soul.emoji}</span>`;
+                const card = document.createElement('div');
+                card.className = 'mini-card';
                 card.innerHTML = `
-                    <div class="soul-card-header">
-                        <div class="soul-card-avatar">${avatarHtml}</div>
+                    <div class="mini-card-head">
+                        <div class="mini-avatar">${avatarHtml}</div>
                         <div>
-                            <div class="soul-card-name">${soul.emoji} ${soul.soul_name}</div>
-                            <div class="soul-card-animal">${soul.animal} / ${soul.archetype}</div>
+                            <div class="mini-name">${soul.emoji} ${soul.soul_name}</div>
+                            <div class="mini-sub">${soul.animal} / ${soul.archetype}</div>
                         </div>
                     </div>
-                    <div class="soul-card-detail">Superpotere: <span>${soul.superpower}</span></div>
-                    <div class="soul-card-detail">Elemento: <span>${soul.element}</span></div>
-                    <div class="soul-card-motto">"${soul.motto}"</div>`;
+                    <div class="mini-detail"><b>Superpotere:</b> ${soul.superpower}</div>
+                    <div class="mini-detail"><b>Elemento:</b> ${soul.element}</div>
+                    <div class="mini-motto">"${soul.motto}"</div>`;
                 soulsEl.appendChild(card);
-            }
+            });
 
             document.getElementById('teamResult').style.display = 'block';
             document.getElementById('teamResult').scrollIntoView({ behavior: 'smooth', block: 'start' });
