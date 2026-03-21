@@ -192,12 +192,12 @@ async def db_get_team(team_id: str) -> dict | None:
 
 async def db_count() -> tuple[int, int]:
     if SUPABASE_ENABLED and db:
-        souls = await db.select("souls", {"select": "id", "limit": "0", "head": "true"})
-        teams = await db.select("teams", {"select": "id", "limit": "0", "head": "true"})
-        # PostgREST doesn't return count easily without range headers; use len as approximation
-        all_souls = await db.select("souls", {"select": "id"})
-        all_teams = await db.select("teams", {"select": "id"})
-        return len(all_souls), len(all_teams)
+        try:
+            all_souls = await db.select("souls", {"select": "id"})
+            all_teams = await db.select("teams", {"select": "id"})
+            return len(all_souls), len(all_teams)
+        except Exception:
+            return 0, 0
     with get_sqlite() as conn:
         sc = conn.execute("SELECT COUNT(*) FROM souls").fetchone()[0]
         tc = conn.execute("SELECT COUNT(*) FROM teams").fetchone()[0]
