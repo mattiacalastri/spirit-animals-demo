@@ -210,9 +210,18 @@ async def db_count() -> tuple[int, int]:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global db
+    global db, SUPABASE_ENABLED
     if SUPABASE_ENABLED:
         db = SupabaseClient(SUPABASE_URL, SUPABASE_KEY)
+        # Verify tables exist; fallback to SQLite if not
+        try:
+            await db.select("souls", {"select": "id", "limit": "1"})
+        except Exception:
+            print("WARNING: Supabase tables not found, falling back to SQLite")
+            await db.close()
+            db = None
+            SUPABASE_ENABLED = False
+            init_sqlite()
     else:
         init_sqlite()
     yield
