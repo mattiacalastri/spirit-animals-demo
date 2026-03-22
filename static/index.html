@@ -707,10 +707,13 @@
 
         <!-- ═══ TAB 3: API Docs ═══ -->
         <div class="tab-panel" id="tab-api">
+            <div class="card api-card" style="margin-bottom:0.5rem;">
+                <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:1rem;">Base URL: <code id="baseUrl" style="color:var(--teal);cursor:pointer;" onclick="navigator.clipboard.writeText(this.textContent)"></code> <span style="font-size:0.65rem;opacity:0.5;">(click to copy)</span></p>
+            </div>
             <div class="card api-card">
                 <h3><span class="api-method post">POST</span> /api/generate-soul</h3>
                 <pre><span class="c"># Genera una singola AI Soul</span>
-curl -X POST /api/generate-soul \
+curl -X POST <span class="api-base"></span>/api/generate-soul \
   -H "Content-Type: application/json" \
   -d '{
     <span class="k">"name"</span>: <span class="s">"Marco"</span>,
@@ -722,7 +725,7 @@ curl -X POST /api/generate-soul \
             <div class="card api-card">
                 <h3><span class="api-method post">POST</span> /api/generate-team</h3>
                 <pre><span class="c"># Genera N souls in parallelo + analisi sinergie</span>
-curl -X POST /api/generate-team \
+curl -X POST <span class="api-base"></span>/api/generate-team \
   -H "Content-Type: application/json" \
   -d '{
     <span class="k">"team_name"</span>: <span class="s">"Astra Core"</span>,
@@ -736,29 +739,34 @@ curl -X POST /api/generate-team \
             <div class="card api-card">
                 <h3><span class="api-method get">GET</span> Query Endpoints</h3>
                 <pre><span class="c"># Tutte le souls generate</span>
-<span class="k">GET</span> /api/souls?limit=50
+<span class="k">GET</span> <span class="api-base"></span>/api/souls?limit=50
 
 <span class="c"># Soul per ID</span>
-<span class="k">GET</span> /api/souls/{id}
+<span class="k">GET</span> <span class="api-base"></span>/api/souls/{id}
 
 <span class="c"># Tutti i team</span>
-<span class="k">GET</span> /api/teams
+<span class="k">GET</span> <span class="api-base"></span>/api/teams
 
 <span class="c"># Team con souls e sinergie</span>
-<span class="k">GET</span> /api/teams/{team_id}
+<span class="k">GET</span> <span class="api-base"></span>/api/teams/{team_id}
 
 <span class="c"># Health + contatori</span>
-<span class="k">GET</span> /api/health</pre>
+<span class="k">GET</span> <span class="api-base"></span>/api/health</pre>
             </div>
         </div>
     </div>
 
     <footer>
         <p class="mission">"Ogni persona ha un'anima digitale. Noi la riveliamo."</p>
-        <p>Spirit Animals Engine v0.2 &mdash; Astra OS</p>
+        <p>Spirit Animals Engine v0.3 &mdash; Astra OS</p>
     </footer>
 
     <script>
+        // ── Base URL for API docs ──
+        const base = window.location.origin;
+        document.getElementById('baseUrl').textContent = base;
+        document.querySelectorAll('.api-base').forEach(el => { el.textContent = base; el.style.color = 'var(--teal)'; });
+
         // ── Tabs ──
         document.querySelectorAll('.tab').forEach(tab => {
             tab.addEventListener('click', () => {
