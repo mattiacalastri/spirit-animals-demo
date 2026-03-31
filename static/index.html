@@ -709,12 +709,14 @@
         <div class="tab-panel" id="tab-api">
             <div class="card api-card" style="margin-bottom:0.5rem;">
                 <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:1rem;">Base URL: <code id="baseUrl" style="color:var(--teal);cursor:pointer;" onclick="navigator.clipboard.writeText(this.textContent)"></code> <span style="font-size:0.65rem;opacity:0.5;">(click to copy)</span></p>
+                <p style="font-size:0.75rem;color:var(--amber);margin-bottom:1rem;">Auth required: pass <code style="color:var(--amber);">X-Api-Key</code> header on POST endpoints. Rate limit: 10 req/hour. <a href="https://app.mattiacalastri.com/widget/bookings/consulenza-calastri" style="color:var(--teal);">Request an API key</a></p>
             </div>
             <div class="card api-card">
                 <h3><span class="api-method post">POST</span> /api/generate-soul</h3>
                 <pre><span class="c"># Genera una singola AI Soul</span>
 curl -X POST <span class="api-base"></span>/api/generate-soul \
   -H "Content-Type: application/json" \
+  -H "X-Api-Key: YOUR_API_KEY" \
   -d '{
     <span class="k">"name"</span>: <span class="s">"Marco"</span>,
     <span class="k">"role"</span>: <span class="s">"Full Stack Developer"</span>,
@@ -727,6 +729,7 @@ curl -X POST <span class="api-base"></span>/api/generate-soul \
                 <pre><span class="c"># Genera N souls in parallelo + analisi sinergie</span>
 curl -X POST <span class="api-base"></span>/api/generate-team \
   -H "Content-Type: application/json" \
+  -H "X-Api-Key: YOUR_API_KEY" \
   -d '{
     <span class="k">"team_name"</span>: <span class="s">"Astra Core"</span>,
     <span class="k">"members"</span>: [
@@ -799,7 +802,7 @@ curl -X POST <span class="api-base"></span>/api/generate-team \
             try {
                 const res = await fetch('/api/generate-soul', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'X-Api-Key': 'sa-demo-2026' },
                     body: JSON.stringify(body),
                 });
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -886,7 +889,7 @@ curl -X POST <span class="api-base"></span>/api/generate-team \
             try {
                 const res = await fetch('/api/generate-team', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'X-Api-Key': 'sa-demo-2026' },
                     body: JSON.stringify({ team_name: teamName, members }),
                 });
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);

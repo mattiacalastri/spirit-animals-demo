@@ -7,10 +7,12 @@ import os
 import json
 import asyncio
 import uuid
+import time
+from collections import defaultdict
 from datetime import datetime, timezone
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -32,6 +34,33 @@ SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
 SUPABASE_ENABLED = bool(SUPABASE_URL and SUPABASE_KEY)
 
 claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+
+# API Key auth — protegge i POST che consumano crediti Claude/fal.ai
+DEMO_API_KEY = os.getenv("SPIRIT_DEMO_API_KEY", "sa-demo-2026")
+VALID_API_KEYS = {
+    DEMO_API_KEY,  # embedded nel frontend per la demo
+    *filter(None, os.getenv("SPIRIT_API_KEYS", "").split(",")),  # chiavi aggiuntive
+}
+
+# Rate limiting semplice: max N generazioni per IP per finestra
+RATE_LIMIT_WINDOW = 3600  # 1 ora
+RATE_LIMIT_MAX = 10  # max 10 generazioni/ora per IP
+_rate_store: dict[str, list[float]] = defaultdict(list)
+
+
+def _check_rate_limit(client_ip: str) -> None:
+    now = time.time()
+    hits = _rate_store[client_ip]
+    # Pulisci entry vecchie
+    _rate_store[client_ip] = [t for t in hits if now - t < RATE_LIMIT_WINDOW]
+    if len(_rate_store[client_ip]) >= RATE_LIMIT_MAX:
+        raise HTTPException(status_code=429, detail="Rate limit exceeded. Max 10 generations per hour.")
+    _rate_store[client_ip].append(now)
+
+
+def _verify_api_key(x_api_key: str | None) -> None:
+    if not x_api_key or x_api_key not in VALID_API_KEYS:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key. Pass X-Api-Key header.")
 
 
 # ---------------------------------------------------------------------------
@@ -415,7 +444,9 @@ def make_soul_response(soul_data: dict, soul_id: str, team_id: str | None = None
 # ---------------------------------------------------------------------------
 
 @app.post("/api/generate-soul", response_model=SoulResponse)
-async def api_generate_soul(req: SoulRequest):
+async def api_generate_soul(req: SoulRequest, request: Request, x_api_key: str | None = Header(None)):
+    _verify_api_key(x_api_key)
+    _check_rate_limit(request.client.host)
     user_input = build_user_input(req)
 
     try:
@@ -446,7 +477,9 @@ async def api_generate_soul(req: SoulRequest):
 
 
 @app.post("/api/generate-team", response_model=TeamResponse)
-async def api_generate_team(req: TeamRequest):
+async def api_generate_team(req: TeamRequest, request: Request, x_api_key: str | None = Header(None)):
+    _verify_api_key(x_api_key)
+    _check_rate_limit(request.client.host)
     if len(req.members) < 2:
         raise HTTPException(status_code=400, detail="Servono almeno 2 membri")
     if len(req.members) > 10:
