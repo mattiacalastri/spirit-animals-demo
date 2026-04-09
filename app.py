@@ -27,7 +27,7 @@ if os.path.exists(os.path.expanduser("~/.config/credentials/aurahome.env")):
     load_dotenv(os.path.expanduser("~/.config/credentials/aurahome.env"))
     load_dotenv(os.path.expanduser("~/claude_voice/.env"))
 
-CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-3-haiku-20240307")
+CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-haiku-4-5-20251001")
 FAL_ENABLED = bool(os.getenv("FAL_KEY"))
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
