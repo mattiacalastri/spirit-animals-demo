@@ -22,10 +22,7 @@ import anthropic
 import fal_client
 import httpx
 
-# Credenziali: env vars in produzione, file locali in dev
-if os.path.exists(os.path.expanduser("~/.config/credentials/aurahome.env")):
-    load_dotenv(os.path.expanduser("~/.config/credentials/aurahome.env"))
-    load_dotenv(os.path.expanduser("~/claude_voice/.env"))
+load_dotenv()
 
 CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-haiku-4-5-20251001")
 FAL_ENABLED = bool(os.getenv("FAL_KEY"))
